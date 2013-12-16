@@ -1,0 +1,21 @@
+.wps-bv {
+    background-image:url(../img/bv3d.png) !important;
+    height:20px !important;
+    width:20px !important;
+}
+.wps-bvfromselection {
+    background-image: url(../img/table_go.png) !important;
+}
+.wps-help {
+    background-image: url(../img/help.png) !important;
+}
+.ogc {
+    background-image: url(../img/wms_go.png) !important;
+    height:20px !important;
+    width:20px !important;
+}
+.wps-uploadfile {
+    background-image: url(../img/upload_file.png) !important;
+    height:20px !important;
+    width:20px !important;
+}
