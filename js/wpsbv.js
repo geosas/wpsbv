@@ -687,8 +687,9 @@ GEOR.Addons.Wpsbv.prototype = (function () {
                      transitionEffect: 'resize'
                     }
                 );
-                var c = GeoExt.data.LayerRecord.create();
-                var layerRecord = new c({layer: wmsdyn, name: layerName});
+//                var c = GeoExt.data.LayerRecord.create();
+		var c = GEOR.util.createRecordType();
+                var layerRecord = new c({layer: wmsdyn, name: layerName, type: "WMS"});
                 var clone = layerRecord.clone () ;
                 GEOR.ows.hydrateLayerRecord(clone,      {
                     success: function(){
