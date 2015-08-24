@@ -4,7 +4,7 @@
         "../../../lib/externals/openlayers/lib/OpenLayers/Format/OWSCommon/v1_1_0.js",
         "../../../lib/externals/openlayers/lib/OpenLayers/Format/WPSDescribeProcess.js",
         "../../../lib/externals/openlayers/lib/OpenLayers/Format/WKT.js",
-        "../../../lib/externals/ext/examples/ux/fileuploadfield/FileUploadField.js",
+        "js/FileUploadField.js",
         "js/WPSAxacute.js",
         "js/wpsbv.js"
     ],
