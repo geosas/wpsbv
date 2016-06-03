@@ -1,14 +1,19 @@
+/**
+ * @include OpenLayers/Control/DrawFeature.js
+ * @include OpenLayers/Control/ModifyFeature.js
+ * @include OpenLayers/Control/SelectFeature.js
+ * @include OpenLayers/Handler/Point.js
+ * @include OpenLayers/Lang.js
+ * @include GeoExt/widgets/Action.js
+ * @include GeoExt/widgets/MapPanel.js
+ * @include GeoExt/widgets/Popup.js
+ */
+
+
+
 Ext.namespace("GEOR.Addons");
 
-GEOR.Addons.Wpsbv = function (map, options) {
-    this.map = map;
-    this.options = options;
-    this.item = null;
-    this.toolbar = null;
-};
-
-
-GEOR.Addons.Wpsbv.prototype = (function () {
+GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
 
     /*
      * Private
@@ -18,75 +23,89 @@ GEOR.Addons.Wpsbv.prototype = (function () {
      * Property: map
      * {OpenLayers.Map} The map instance.
      */
-    var map = null;
+    map: null,
 
     /**
      * Property: drawLayer
      * {OpenLayers.Layer.Vector}.
      */
-    var drawLayer = null;
+    drawLayer: null,
 
     /**
      * Property: layerStore
      * {GeoExt.data.LayerStore} The application's layer store.
      */
-    var layerStore = null;
+    layerStore: null,
 
     /**
      * Property: wpsURL
      * URL of the WPS service.
      */
-    var wpsURL = null;
+    wpsURL: null,
 
     /**
      * Property: wpsIdentifier
      * Name of the WPS.
      */
-    var wpsIdentifier;
+    wpsIdentifier: null,
 
     /**
      * Property: wpsInitialized
      * occurs when the wps describeProcess returns a response
      * boolean.
      */
-    var wpsInitialized = false;
+    wpsInitialized: false,
 
     /*
      * Property: zoomToResultLayer
      * {Boolean} zoom to result layer extent.
      */
-    var zoomToResultLayer = true;
-    
+    zoomToResultLayer: true,
+
     /*
      * Property: enableDEM
      * Optional dem list for selecting enable dem
      */
-    var enableDEM = [];
-    
+    enableDEM: [],
+
     /*
      * Property: defaultDEM
      * Optional default DEM used by the WPS
      */
-    var defaultDEM = "";
-    
-        /*
+    defaultDEM: "",
+
+    /*
      * Property: config
      * Contain all addon parameters.
      */
-    var config = null;
-    
+    config: null,
+
     /*
      * Property: wpsConfig
      * Contain all WPS parameters.
      */
-    var wpsConfig = null;
+    wpsConfig: null,
 
- //   var configForm = null;
+    /** private: property[defaultStyle]
+     *  ``Object`` Feature style hash to apply to the default
+     *   OpenLayers.Feature.Vector.style['default'] if no style was specified.
+     */
+    defaultStyle: {
+        fillColor: '#0099FF',
+        strokeColor: "#000000",
+        fontColor: "#000000",
+        pointRadius: 6,
+        strokeWidth: 2,
+        fillOpacity: 0.6
+    },
 
-    var mask_loader;
-    var tr = function (str) {
+    mask_loader: null,
+
+    _drawControl: null,
+
+    tr: function(str) {
         return OpenLayers.i18n(str);
-    };
+    },
 
     /**
      * Method: convertToGML
@@ -95,17 +114,17 @@ GEOR.Addons.Wpsbv.prototype = (function () {
      * Parameters:
      * feature - {OpenLayers.Feature.Vector}
      */
-    var convertToGML = function (feature) {
-            var gmlP = new OpenLayers.Format.GML();
-            var inGML = gmlP.write(feature).replace(/<\?xml.[^>]*>/, "");
-            return inGML;
-        };
+    convertToGML: function(feature) {
+        var gmlP = new OpenLayers.Format.GML();
+        var inGML = gmlP.write(feature).replace(/<\?xml.[^>]*>/, "");
+        return inGML;
+    },
 
     /**
      * Method: findDataInputsByIdentifier
      * 
      */
-    var findDataInputsByIdentifier = function (datainputs, identifier) {
+    findDataInputsByIdentifier: function(datainputs, identifier) {
         var datainput, i;
         for (i = 0; i < datainputs.length; i++) {
             if (datainputs[i].identifier === identifier) {
@@ -114,7 +133,7 @@ GEOR.Addons.Wpsbv.prototype = (function () {
             }
         }
         return datainput;
-    };
+    },
 
     /**
      * Method: onDescribeProcess
@@ -124,45 +143,45 @@ GEOR.Addons.Wpsbv.prototype = (function () {
      * Parameters:
      * response - XML response
      */
-    var onDescribeProcess = function (process) {
-        var mnt = findDataInputsByIdentifier(process.dataInputs,"MNT Utilise");            
+    onDescribeProcess: function(process) {
+        var mnt = this.findDataInputsByIdentifier(process.dataInputs, "MNT Utilise");
         var datamnt = [];
         for (var obj in mnt.literalData.allowedValues) {
             if (mnt.literalData.allowedValues.hasOwnProperty(obj)) {
-                if (enableDEM.length < 1 || enableDEM.indexOf(obj) > -1) { // enableDEM defined in GEOR_custom.js or not
+                if (this.enableDEM.length < 1 || this.enableDEM.indexOf(obj) > -1) { // enableDEM defined in GEOR_custom.js or not
                     datamnt.push([obj]);
                 }
             }
         }
-	if (defaultDEM === null) { // defaultDEM defined in GEOR_custom.js or not
-             defaultDEM = (mnt.literalData.defaultValue)?mnt.literalData.defaultValue:"Bretagne 50m";
-	}
-        var surfacemin = findDataInputsByIdentifier(process.dataInputs,"surfacemin");
-        var lissage = findDataInputsByIdentifier(process.dataInputs,"lissage");            
+        if (this.defaultDEM === null) { // defaultDEM defined in GEOR_custom.js or not
+            this.defaultDEM = (mnt.literalData.defaultValue) ? mnt.literalData.defaultValue : "Bretagne 50m";
+        }
+        var surfacemin = this.findDataInputsByIdentifier(process.dataInputs, "surfacemin");
+        var lissage = this.findDataInputsByIdentifier(process.dataInputs, "lissage");
         var datalissage = [];
         for (obj in lissage.literalData.allowedValues) {
-            if(lissage.literalData.allowedValues.hasOwnProperty(obj)){
-                 datalissage.push([obj]);
-            } 
+            if (lissage.literalData.allowedValues.hasOwnProperty(obj)) {
+                datalissage.push([obj]);
+            }
         }
-        wpsConfig = {
+        this.wpsConfig = {
             mnt: {
-                value: defaultDEM,
+                value: this.defaultDEM,
                 title: mnt.title,
                 allowedValues: datamnt
             },
             surfacemin: {
-                value: (surfacemin.literalData.defaultValue)?surfacemin.literalData.defaultValue:50,
+                value: (surfacemin.literalData.defaultValue) ? surfacemin.literalData.defaultValue : 50,
                 title: surfacemin.title
             },
             lissage: {
-                value: (lissage.literalData.defaultValue)?lissage.literalData.defaultValue:"Oui",
+                value: (lissage.literalData.defaultValue) ? lissage.literalData.defaultValue : "Oui",
                 title: lissage.title,
                 allowedValues: datalissage
             }
         };
-        wpsInitialized = true;
-    };
+        this.wpsInitialized = true;
+    },
 
     /**
      * Method: describeProcess
@@ -170,7 +189,8 @@ GEOR.Addons.Wpsbv.prototype = (function () {
      * Parameters:
      * String url, String identifier du process WPS.
      */
-    var describeProcess = function (url, identifier) {
+    describeProcess: function(url, identifier) {
+        var self = this;
         OpenLayers.Request.GET({
             url: url,
             params: {
@@ -181,147 +201,150 @@ GEOR.Addons.Wpsbv.prototype = (function () {
             },
             success: function(response) {
                 var wpsProcess = new OpenLayers.Format.WPSDescribeProcess().read(response.responseText).processDescriptions[identifier];
-                onDescribeProcess(wpsProcess);
+                self.onDescribeProcess(wpsProcess);
             }
         });
-    };
+    },
 
     /**
      * Method: enableSelectionTool
      *
-     * Retourne true si une s�lection est effectu�e dans le Panel Results
+     * Retourne true si une selection est effectuee dans le Panel Results
      * Parameters:
      * m - {OpenLayers.Map} The map instance.
      */
-    var enableSelectionTool = function (m) {
-            var response = false;
-            var searchLayers = m.getLayersByName("search_results");
-            if (searchLayers.length == 1) {
-                var features = searchLayers[0].features;
-                var selectedFeatures = searchLayers[0].selectedFeatures;
+    enableSelectionTool: function(m) {
+        var response = false;
+        var southPanel = Ext.getCmp("southpanel");
+        if (southPanel) {
+            var tab = southPanel.getActiveTab()
+            if (tab && tab._vectorLayer) {
+                var features = tab._vectorLayer.features;
+                var selectedFeatures = tab._vectorLayer.selectedFeatures;
                 if (features.length > 0 || selectedFeatures.length > 0) {
                     response = true;
                 }
             }
-            return response;
-        };
+        }
+        return response;
+    },
     /**
      * Method: createParametersForm
      * Return a Form with tool parameters
      *
      */
-    var createParametersForm = function () {
+    createParametersForm: function() {
 
-            var mntStore = new Ext.data.SimpleStore({
-                fields: [{
-                    name: 'value',
-                    mapping: 0
-                }],
-                data: wpsConfig.mnt.allowedValues
-            });
-            var lissageStore = new Ext.data.SimpleStore({
-                fields: [{
-                    name: 'value',
-                    mapping: 0
-                }],
-                data: wpsConfig.lissage.allowedValues
-            });
-            var mntCombo = new Ext.form.ComboBox({
-                name: 'mnt',
-//                fieldLabel: wpsConfig.mnt.title,
-                fieldLabel: tr ("mntsurf.mntTitle"),
-                store: mntStore,
-                valueField: 'value',
-                value: wpsConfig.mnt.value,
-                displayField: 'value',
-                editable: false,
-                mode: 'local',
-                triggerAction: 'all',
-                width: 150
-            });
+        var self = this;
+        var mntStore = new Ext.data.SimpleStore({
+            fields: [{
+                name: 'value',
+                mapping: 0
+            }],
+            data: this.wpsConfig.mnt.allowedValues
+        });
+        var lissageStore = new Ext.data.SimpleStore({
+            fields: [{
+                name: 'value',
+                mapping: 0
+            }],
+            data: this.wpsConfig.lissage.allowedValues
+        });
+        var mntCombo = new Ext.form.ComboBox({
+            name: 'mnt',
+            //                fieldLabel: this.wpsConfig.mnt.title,
+            fieldLabel: tr("mntsurf.mntTitle"),
+            store: mntStore,
+            valueField: 'value',
+            value: this.wpsConfig.mnt.value,
+            displayField: 'value',
+            editable: false,
+            mode: 'local',
+            triggerAction: 'all',
+            width: 150
+        });
 
-            var surfaceMinNumber = new Ext.ux.NumberSpinner({
-                name: 'surfacemin',
-//                fieldLabel: wpsConfig.surfacemin.title,
-                fieldLabel: tr ("mntsurf.surfaceminTitle"),
-                allowNegative: false,
-                allowDecimals: false,
+        var surfaceMinNumber = new Ext.ux.NumberSpinner({
+            name: 'surfacemin',
+            //                fieldLabel: this.wpsConfig.surfacemin.title,
+            fieldLabel: tr("mntsurf.surfaceminTitle"),
+            allowNegative: false,
+            allowDecimals: false,
 
-                value: wpsConfig.surfacemin.value,
-                minValue: 1,
-                maxValue: 100000,
-                width: 50
-            });
+            value: this.wpsConfig.surfacemin.value,
+            minValue: 1,
+            maxValue: 100000,
+            width: 50
+        });
 
-            var lissageCombo = new Ext.form.ComboBox({
-                name: 'lissage',
-//                fieldLabel: wpsConfig.lissage.title,
-                fieldLabel: tr ("mntsurf.lissageTitle"),
-                store: lissageStore,
-                valueField: 'value',
-                value: wpsConfig.lissage.value,
-                displayField: 'value',
-                editable: false,
-                mode: 'local',
-                triggerAction: 'all',
-                width: 60
-            });
+        var lissageCombo = new Ext.form.ComboBox({
+            name: 'lissage',
+            //                fieldLabel: this.wpsConfig.lissage.title,
+            fieldLabel: tr("mntsurf.lissageTitle"),
+            store: lissageStore,
+            valueField: 'value',
+            value: this.wpsConfig.lissage.value,
+            displayField: 'value',
+            editable: false,
+            mode: 'local',
+            triggerAction: 'all',
+            width: 60
+        });
 
-            var configForm = new Ext.FormPanel({
-                labelWidth: 220,
-                height: 200,
-                layout: 'form',
-                bodyStyle: 'padding: 10px',
-                id: 'bvconfigform',
-                defaultType: 'textfield',
-                items: [mntCombo, surfaceMinNumber, lissageCombo,
-                {
-                    id: 'chkzoomextent',
-                    width: 200,
-                    xtype: 'checkbox',
-                    fieldLabel: tr ("mntsurf.zoomToResultLayer"),
-                    checked: zoomToResultLayer
-                }],
+        var configForm = new Ext.FormPanel({
+            labelWidth: 220,
+            height: 200,
+            layout: 'form',
+            bodyStyle: 'padding: 10px',
+            id: 'bvconfigform',
+            defaultType: 'textfield',
+            items: [mntCombo, surfaceMinNumber, lissageCombo, {
+                id: 'chkzoomextent',
+                width: 200,
+                xtype: 'checkbox',
+                fieldLabel: tr("mntsurf.zoomToResultLayer"),
+                checked: this.zoomToResultLayer
+            }],
 
-                buttons: [{
-                    text: tr("Apply"),
-                    handler: function() {
-                        wpsConfig.mnt.value = mntCombo.getValue();
-                        wpsConfig.surfacemin.value = surfaceMinNumber.getValue();
-                        wpsConfig.lissage.value = lissageCombo.getValue();
-                        zoomToResultLayer = configForm.getForm().findField('chkzoomextent').getValue();
-                        configForm.findParentByType('window').destroy();
-                    }
-                },{
-                    text: tr("Cancel"),
-                    handler: function() {
-                          configForm.findParentByType('window').destroy();
-                    }
-                }]
-            });
+            buttons: [{
+                text: tr("Apply"),
+                handler: function() {
+                    self.wpsConfig.mnt.value = mntCombo.getValue();
+                    self.wpsConfig.surfacemin.value = surfaceMinNumber.getValue();
+                    self.wpsConfig.lissage.value = lissageCombo.getValue();
+                    self.zoomToResultLayer = configForm.getForm().findField('chkzoomextent').getValue();
+                    //                        GEOR.Addons.Wpsbv.zoomToResultLayer = configForm.getForm().findField('chkzoomextent').getValue();
+                    configForm.findParentByType('window').destroy();
+                }
+            }, {
+                text: tr("Cancel"),
+                handler: function() {
+                    configForm.findParentByType('window').destroy();
+                }
+            }]
+        });
+        return configForm;
+    },
 
-            return configForm;
-        };
-	
     /**
      * Method: getBvParameters
      *
-     * Retourne les valeurs des param�tres de l'outil
+     * Retourne les valeurs des parametres de l'outil
      *
      */
-    var getBvParameters = function () {
-            var form = createParametersForm();
-            var win = new Ext.Window({
-                closable: true,
-                title: tr("mntsurf.parameterstool"),
-                border: false,
-                plain: true,
-                region: 'center',
-                items: [form]
-            });
-            win.render(Ext.getBody());
-            win.show();
-        };
+    getBvParameters: function() {
+        var form = this.createParametersForm();
+        var win = new Ext.Window({
+            closable: true,
+            title: tr("mntsurf.parameterstool"),
+            border: false,
+            plain: true,
+            region: 'center',
+            items: [form]
+        });
+        win.render(Ext.getBody());
+        win.show();
+    },
 
 
     /**
@@ -330,32 +353,38 @@ GEOR.Addons.Wpsbv.prototype = (function () {
      * Parameters:
      * map - {OpenLayers.Map} The map instance.
      */
-    var getMapFeaturesSelection = function (map) {
-            var searchLayer = map.getLayersByName("search_results");
-            var selectedFeatures = searchLayer[0].selectedFeatures;
-            var features = (selectedFeatures.length > 0)?selectedFeatures:searchLayer[0].features;
+    getMapFeaturesSelection: function(map) {
+        var southPanel = Ext.getCmp("southpanel");
+        if (southPanel) {
+            var tab = southPanel.getActiveTab()
+            if (tab && tab._vectorLayer) {
+                var selectedFeatures = tab._vectorLayer.selectedFeatures;
+                var features = (selectedFeatures.length > 0) ? selectedFeatures : tab._vectorLayer.features;
+                if (features.length > 0) {
+                    this.drawLayer.destroyFeatures();
+                    if (features[0].geometry.CLASS_NAME == "OpenLayers.Geometry.Point") {
+                        for (var i = 0; i < features.length; i++) {
+                            var feat = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(features[i].geometry.getVertices()[0].x, features[i].geometry.getVertices()[0].y));
+                            /*
+                                                            feat.style = {
+                                                                pointRadius: 18,
+                                                                fillColor: '#0055FF',
+                                                                fillOpacity: 0.8,
+                                                                strokeColor: '#000000'
+                                                            };
+                            */
+                            this.drawLayer.addFeatures([feat]);
+                        }
+                        //                        var gml = this.convertToGML (this.drawLayer.features) ;
+                        //                        this.executeWPS(gml);
+                        this.executeWPS();
 
-            if (features.length > 0) {
-                if (features[0].geometry.CLASS_NAME == "OpenLayers.Geometry.Point")	{ 
-			for (var i = 0; i < features.length; i++) {
-				var feat = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(features[i].geometry.getVertices()[0].x, features[i].geometry.getVertices()[0].y));
-                                feat.style = {
-                                    pointRadius: 4,
-                                    fillColor: '#00FF00',
-                                    fillOpacity: 0.8,
-                                    strokeColor: '#000000'
-                                };
-				drawLayer.addFeatures([feat]);
-			}
-                        var gml = convertToGML (drawLayer.features) ;
-                        executeWPS(gml);
-//			drawLayer.removeAllFeatures();
-
-                } else {
+                    } else {
                         GEOR.util.errorDialog({
                             title: tr("mntsurf.error"),
                             msg: tr("mntsurf.error2")
                         });
+                    }
                 }
             } else {
                 GEOR.util.errorDialog({
@@ -363,7 +392,8 @@ GEOR.Addons.Wpsbv.prototype = (function () {
                     msg: tr("mntsurf.error3")
                 });
             }
-        };
+        }
+    },
 
     /**
      * Method: LoadGML
@@ -372,33 +402,34 @@ GEOR.Addons.Wpsbv.prototype = (function () {
      * Parameters:
      * gmlText - String GML.
      */
-    var LoadGML = function (gmlText) {
-            var features = new OpenLayers.Format.GML().read(gmlText);
-            if (features.length > 0) {
-                if (features[0].geometry.CLASS_NAME == "OpenLayers.Geometry.Point")     {
-                    if (features.length <= 10000) {
-                        drawLayer.addFeatures(features) ;
-                        gml = convertToGML (features) ;
-                        executeWPS(gml);
-                    } else {
-                        GEOR.util.errorDialog({
-                            title: tr("mntsurf.error"),
-                            msg: tr("mntsurf.error1") + " : " + features.length
-                        });
-                    }
+    LoadGML: function(gmlText) {
+        var features = new OpenLayers.Format.GML().read(gmlText);
+        if (features.length > 0) {
+            if (features[0].geometry.CLASS_NAME == "OpenLayers.Geometry.Point") {
+                if (features.length <= 10000) {
+                    this.drawLayer.destroyFeatures();
+                    this.drawLayer.addFeatures(features);
+                    gml = this.convertToGML(features);
+                    this.executeWPS(gml);
                 } else {
                     GEOR.util.errorDialog({
                         title: tr("mntsurf.error"),
-                        msg: tr("mntsurf.error2") + " : " + features[0].geometry.CLASS_NAME
+                        msg: tr("mntsurf.error1") + " : " + features.length
                     });
                 }
             } else {
                 GEOR.util.errorDialog({
                     title: tr("mntsurf.error"),
-                    msg: tr("mntsurf.error5") 
+                    msg: tr("mntsurf.error2") + " : " + features[0].geometry.CLASS_NAME
                 });
             }
-        };
+        } else {
+            GEOR.util.errorDialog({
+                title: tr("mntsurf.error"),
+                msg: tr("mntsurf.error5")
+            });
+        }
+    },
 
 
     /**
@@ -406,160 +437,191 @@ GEOR.Addons.Wpsbv.prototype = (function () {
      * Select local GML file
      *
      */
-    var selectGMLFile = function () {
-            // Check for the various File API support.
-            if (window.File && window.FileReader && window.FileList) {
-                //--------------
-                var fileWindow;
-                var fileLoadForm = new Ext.FormPanel({
-                    width: 320,
-                    frame: true,
-                    bodyStyle: 'padding: 10px 10px 0 10px;',
-                    labelWidth: 60,
-                    defaults: {
-                        anchor: '95%'
-                    },
-                    items: [{
-                        xtype: 'fileuploadfield',
-                        emptyText: tr("mntsurf.fileselection"),
-                        fieldLabel: tr("mntsurf.file"),
-                        buttonText: '...',
-                        listeners: {
-                            'fileselected': function (fb, v) {
-                                file = fb.fileInput.dom.files[0];
-                                myfilename = v;
-                                var reader = new FileReader();
-                                reader.onload = function (e) {
-                                    var text = e.target.result;
-                                    if (myfilename.search('.gml') != -1) {
-                                        LoadGML(text);
-                                        fileWindow.hide();
-                                    } else {
-                                        GEOR.util.errorDialog({
-                                            title: tr("mntsurf.error"),
-                                            msg: tr("mntsurf.error4")
-                                        });
-                                    }
-
-                                };
-                                reader.readAsText(file, "UTF-8");
+    selectGMLFile: function() {
+        // Check for the various File API support.
+        if (window.File && window.FileReader && window.FileList) {
+            var fileWindow;
+            var fileLoadForm = new Ext.FormPanel({
+                width: 320,
+                frame: true,
+                bodyStyle: "padding: 10px 10px 0 10px;",
+                labelWidth: 60,
+                defaults: {
+                    anchor: "95%"
+                },
+                items: [{
+                    xtype: "fileuploadfield",
+                    emptyText: this.tr("mntsurf.fileselection"),
+                    fieldLabel: this.tr("mntsurf.file"),
+                    buttonText: "...",
+                    listeners: {
+                        "fileselected": function(fb, v) {
+                            file = fb.fileInput.dom.files[0]
+                            myfilename = v;
+                            var reader = new FileReader();
+                            reader.scope = this.scope;
+                            reader.onload = function(e) {
+                                var text = e.target.result;
+                                if (myfilename.search(".gml") != -1) {
+                                    this.scope.LoadGML(text);
+                                    fileWindow.hide();
+                                } else {
+                                    GEOR.util.errorDialog({
+                                        title: this.scope.tr("mntsurf.error"),
+                                        msg: this.scope.tr("mntsurf.error4")
+                                    });
+                                }
 
                             }
+                            reader.readAsText(file, "UTF-8");
+
                         }
-                    }]
-                });
-
-                fileWindow = new Ext.Window({
-                    closable: true,
-                    width: 320,
-                    title: tr("mntsurf.fileselection"),
-                    border: false,
-                    plain: true,
-                    region: 'center',
-                    items: [fileLoadForm]
-                });
-
-                fileWindow.render(Ext.getBody());
-                fileWindow.show();
-
-            } else {
-                alert('The File APIs are not fully supported in this browser.');
-            }
-        };
-
-    /**
-     * Method: defControl
-     *
-     */
-    var defControl = function () {
-            OpenLayers.Control.Click = OpenLayers.Class(OpenLayers.Control, {
-                defaultHandlerOptions: {
-                    'single': true,
-                    'double': false,
-                    'pixelTolerance': 0,
-                    'stopSingle': false,
-                    'stopDouble': false
-                },
-                initialize: function (options) {
-                    this.handlerOptions = OpenLayers.Util.extend({}, this.defaultHandlerOptions);
-                    OpenLayers.Control.prototype.initialize.apply(
-                    this, arguments);
-                    this.handler = new OpenLayers.Handler.Point(
-                    this, {
-                        'done': this.clickevent
-                    });
-                },
-                clickevent: function (p) {
-                    var feat = new OpenLayers.Feature.Vector(p);
-                    var gml = convertToGML ([feat]) ;
-                    clickbv.deactivate();
-                    executeWPS(gml);
-                },
-                trigger: function (e) {
-                    var lonlat = map.getLonLatFromViewPortPx(e.xy);
-                    var feat = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(lonlat.lon, lonlat.lat));
-                    var gml = convertToGML ([feat]) ;
-                    clickbv.deactivate();
-                    executeWPS(gml);
-                }
+                    },
+                    scope: this
+                }]
             });
-        };
-	
+
+            fileWindow = new Ext.Window({
+                closable: true,
+                width: 320,
+                title: this.tr("mntsurf.fileselection"),
+                border: false,
+                plain: true,
+                region: "center",
+                items: [fileLoadForm]
+            });
+            fileWindow.render(Ext.getBody());
+            fileWindow.show();
+        } else {
+            alert("The File APIs are not fully supported in this browser.");
+        }
+    },
+
     /**
      * Method: executeWPS
      *
-     */ 
-    var executeWPS = function (gml)  {
+     */
+    executeWPS: function(gml) {
 
         mask_loader.show();
 
         var mntin = {
             identifier: "MNT Utilise",
-            data: {literalData: {value: wpsConfig.mnt.value}}
+            data: {
+                literalData: {
+                    value: this.wpsConfig.mnt.value
+                }
+            }
         };
         var surfacemin = {
             identifier: "surfacemin",
-            data: {literalData: {value: wpsConfig.surfacemin.value}}
+            data: {
+                literalData: {
+                    value: this.wpsConfig.surfacemin.value
+                }
+            }
         };
         var lissage = {
             identifier: "lissage",
-            data: {literalData: {value: wpsConfig.lissage.value}}
+            data: {
+                literalData: {
+                    value: this.wpsConfig.lissage.value
+                }
+            }
         };
         var epsgIn = {
             identifier: "EPSG IN",
-            data: {literalData: {value: GEOR.config.MAP_SRS.toLowerCase()}}
-//          data: {literalData: {value: "auto"}}
+            data: {
+                literalData: {
+                    value: GEOR.config.MAP_SRS.toLowerCase()
+                }
+            }
+            //          data: {literalData: {value: "auto"}}
         };
         var epsgOut = {
             identifier: "EPSG OUT",
-            data: {literalData: {value: GEOR.config.MAP_SRS.toLowerCase()}}
-//            data: {literalData: {value: "epsg:2154"}}
+            data: {
+                literalData: {
+                    value: GEOR.config.MAP_SRS.toLowerCase()
+                }
+            }
+            //            data: {literalData: {value: "epsg:2154"}}
         };
-	var inputs;
-        if (arguments.length == 1)  { // vector input
+        var inputs, epsgIn;
+        if (arguments.length == 0) { // layer input
+            var gml = this.convertToGML(this.drawLayer.features);
             var gmlIn = {
                 identifier: "Exutoires",
-                data: {complexData: {value: gml}}
-            }; 
-            inputs = [mntin, surfacemin, lissage, epsgIn, epsgOut, gmlIn] ;
-        }else if (arguments.length == 2) { // or reference to WFS input
+                data: {
+                    complexData: {
+                        value: gml
+                    }
+                }
+            };
+            epsgIn = {
+                identifier: "EPSG IN",
+                data: {
+                    literalData: {
+                        value: GEOR.config.MAP_SRS.toLowerCase()
+                    }
+                }
+            };
+            inputs = [mntin, surfacemin, lissage, epsgIn, epsgOut, gmlIn];
+            // Pour les input vecteur en GML, c'est le WPS qui "devine" l'EPSG
+        } else if (arguments.length == 1) { // vector input
+            var gmlIn = {
+                identifier: "Exutoires",
+                data: {
+                    complexData: {
+                        value: gml
+                    }
+                }
+            };
+            epsgIn = {
+                identifier: "EPSG IN",
+                data: {
+                    literalData: {
+                        value: "auto"
+                    }
+                }
+            };
+            inputs = [mntin, surfacemin, lissage, epsgIn, epsgOut, gmlIn];
+        } else if (arguments.length == 2) { // or reference to WFS input
             var urlWFSIn = {
-                identifier:"urlWFSIn",
-                data: {literalData: {value: arguments[0]}}
+                identifier: "urlWFSIn",
+                data: {
+                    literalData: {
+                        value: arguments[0]
+                    }
+                }
+            };
+            // Pour les flux WFS, c'est le WPS qui "devine" l'EPSG
+            epsgIn = {
+                identifier: "EPSG IN",
+                //                data: {literalData: {value: GEOR.config.MAP_SRS.toLowerCase()}}
+                data: {
+                    literalData: {
+                        value: "auto"
+                    }
+                }
             };
             var layerWFSIn = {
-                identifier:"layerWFSIn",
-                data: {literalData: {value: arguments[1]}}
+                identifier: "layerWFSIn",
+                data: {
+                    literalData: {
+                        value: arguments[1]
+                    }
+                }
             };
-            inputs = [mntin, surfacemin, lissage, epsgIn, epsgOut,  urlWFSIn, layerWFSIn] ;
-        }else       {
-            console.log ("ECHEC in executeWPS with "+arguments.length+" arguments") ;
-            return ;
+            inputs = [mntin, surfacemin, lissage, epsgIn, epsgOut, urlWFSIn, layerWFSIn];
+        } else {
+            console.log("ECHEC in executeWPS with " + arguments.length + " arguments");
+            return;
         }
         var wpsFormat = new OpenLayers.Format.WPSExecute();
         var xmlString = wpsFormat.write({
-            identifier: wpsIdentifier,
-            dataInputs: inputs, 
+            identifier: this.wpsIdentifier,
+            dataInputs: inputs,
             responseForm: {
                 responseDocument: {
                     storeExecuteResponse: true,
@@ -568,7 +630,7 @@ GEOR.Addons.Wpsbv.prototype = (function () {
                     outputs: [{
                         asReference: false,
                         identifier: "url"
-                    },{
+                    }, {
                         asReference: false,
                         identifier: "layer"
                     }]
@@ -576,33 +638,33 @@ GEOR.Addons.Wpsbv.prototype = (function () {
             }
         });
         OpenLayers.Request.POST({
-            url: wpsURL,
+            url: this.wpsURL,
             data: xmlString,
-            success: onExecuted,
-            failure: onError
+            success: this.onExecuted,
+            failure: this.onError,
+            scope: this
         });
-    };
-    
+    },
+
     /**
      * Method: onError
      *
      */
-    var onError = function (process) {
-	mask_loader.hide();
+    onError: function(process) {
+        mask_loader.hide();
         GEOR.util.infoDialog({
             msg: "Echec dans l'execution du processus !<br>\n" + "Raison : " + process.exception.text
         });
-    };
-    
+    },
+
     /**
      * Method: onExecute
      *
      */
-    var onExecuted = function (resp) {
-	mask_loader.hide();
+    onExecuted: function(resp) {
 
-        drawLayer.removeAllFeatures() ;
-
+        var self = this;
+        mask_loader.hide();
         /**
          * Method: zoomToLayerRecordExtent
          * Imported from GEOR_manalayers.js
@@ -611,10 +673,11 @@ GEOR.Addons.Wpsbv.prototype = (function () {
          */
 
         var zoomToLayerRecordExtent = function(r) {
+
             var map = r.get('layer').map,
                 mapSRS = map.getProjection(),
                 zoomed = false,
-                bb = r.get('bbox');		
+                bb = r.get('bbox');
             for (var key in bb) {
                 if (!bb.hasOwnProperty(key)) {
                     continue;
@@ -639,11 +702,11 @@ GEOR.Addons.Wpsbv.prototype = (function () {
             }
         };
 
-	/**
-	* Method: getStatusExecute
-	*
-	*/
-        var getStatusExecute = function (dom) {
+        /**
+         * Method: getStatusExecute
+         *
+         */
+        var getStatusExecute = function(dom) {
             var test = (dom[0].firstElementChild || dom[0].firstChild);
             return (test.nodeName == "wps:ProcessSucceeded") ? "success" : "fail";
         };
@@ -656,68 +719,73 @@ GEOR.Addons.Wpsbv.prototype = (function () {
         if (getStatusExecute(domStatus) === "success") {
             var layerUrl = null;
             var layerName = null;
-            var procOutputsDom = OpenLayers.Format.XML.prototype.getElementsByTagNameNS(dom,wpsNS,"ProcessOutputs");
+            var procOutputsDom = OpenLayers.Format.XML.prototype.getElementsByTagNameNS(dom, wpsNS, "ProcessOutputs");
             var outputs = null;
             if (procOutputsDom.length) {
-                outputs = OpenLayers.Format.XML.prototype.getElementsByTagNameNS(procOutputsDom[0],wpsNS,"Output");
+                outputs = OpenLayers.Format.XML.prototype.getElementsByTagNameNS(procOutputsDom[0], wpsNS, "Output");
             }
             for (var i = 0; i < outputs.length; i++) {
                 var identifier = OpenLayers.Format.XML.prototype.getElementsByTagNameNS(outputs[i], owsNS, "Identifier")[0].firstChild.nodeValue;
-                var literalData = OpenLayers.Format.XML.prototype.getElementsByTagNameNS(outputs[i],wpsNS,  "LiteralData");
-                if (identifier == "url"){
-                    if(literalData.length > 0) {
-                        layerUrl=literalData[0].firstChild.nodeValue; 
+                var literalData = OpenLayers.Format.XML.prototype.getElementsByTagNameNS(outputs[i], wpsNS, "LiteralData");
+                if (identifier == "url") {
+                    if (literalData.length > 0) {
+                        layerUrl = literalData[0].firstChild.nodeValue;
                     }
                 }
-                if (identifier == "layer"){
-                    if(literalData.length > 0) {
-                        layerName=literalData[0].firstChild.nodeValue; 
+                if (identifier == "layer") {
+                    if (literalData.length > 0) {
+                        layerName = literalData[0].firstChild.nodeValue;
                     }
                 }
             }
-            if (layerUrl !== null && layerName !== null)   {
+            if (layerUrl !== null && layerName !== null) {
                 GEOR.waiter.show();
                 var wmsdyn = new OpenLayers.Layer.WMS(
                     "Dynamic layer",
-                    layerUrl,
-                    {layers: layerName,
-                     transparent: true
-                    },
-                    {singletile: true,
-                     transitionEffect: 'resize'
+                    layerUrl, {
+                        layers: layerName,
+                        transparent: true
+                    }, {
+                        singletile: true,
+                        transitionEffect: 'resize'
                     }
                 );
-//                var c = GeoExt.data.LayerRecord.create();
-		var c = GEOR.util.createRecordType();
-                var layerRecord = new c({layer: wmsdyn, name: layerName, type: "WMS"});
-                var clone = layerRecord.clone () ;
-                GEOR.ows.hydrateLayerRecord(clone,      {
-                    success: function(){
-                        clone.get("layer").setName(clone.get ("title"));
-                        layerStore.addSorted(clone);
-                        if (zoomToResultLayer)     {
+                //                var c = GeoExt.data.LayerRecord.create();
+                var c = GEOR.util.createRecordType();
+                var layerRecord = new c({
+                    layer: wmsdyn,
+                    name: layerName,
+                    type: "WMS"
+                });
+                var clone = layerRecord.clone();
+                GEOR.ows.hydrateLayerRecord(clone, {
+                    success: function() {
+                        clone.get("layer").setName(clone.get("title"));
+                        this.layerStore.addSorted(clone);
+                        //                        if (GEOR.Addons.Wpsbv.zoomToResultLayer)     {
+                        if (this.zoomToResultLayer) {
                             zoomToLayerRecordExtent(clone);
                         }
                         GEOR.waiter.hide();
                     },
                     failure: function() {
                         GEOR.util.errorDialog({
-                            msg: tr ("mntsurf.impossible")
+                            msg: tr("mntsurf.impossible")
 
                         });
-			GEOR.waiter.hide();
-//                       layerStore.addSorted(clone);
+                        GEOR.waiter.hide();
+                        //                       layerStore.addSorted(clone);
                     },
                     scope: this
-                }) ;
-            }else{
+                });
+            } else {
                 GEOR.util.infoDialog({
                     msg: tr("mntsurf.noresultcover")
                 });
 
             }
         }
-    };
+    },
 
     /**
      * Method: onCoverItemCheck
@@ -726,19 +794,20 @@ GEOR.Addons.Wpsbv.prototype = (function () {
      * Parameters:
      * record - {GeoExt.data.LayerRecord} the input record.
      */
-    var onCoverItemCheck = function(record){
+    onCoverItemCheck: function(record) {
+        var self = this;
         GEOR.ows.WMSDescribeLayer(record, {
             success: function(store, records) {
                 wfsInfo = GEOR.ows.getWfsInfo(records);
-                if (wfsInfo)	{
-                    executeWPS (wfsInfo.get("owsURL"), wfsInfo.get("typeName"));
+                if (wfsInfo) {
+                    self.executeWPS(wfsInfo.get("owsURL"), wfsInfo.get("typeName"));
                 }
             },
-            failure:function()	{
-                console.log ("WMSDescribeLayer failed for "+record.get('layer'));
+            failure: function() {
+                console.log("WMSDescribeLayer failed for " + record.get('layer'));
             }
-        }) ;
-    };
+        });
+    },
 
     /**
      * Method: createCoverMenuItems
@@ -748,163 +817,238 @@ GEOR.Addons.Wpsbv.prototype = (function () {
      * Returns:
      * {Ext.menu.Menu} The configured covers menu
      */
-    var createCoverMenuItems = function() {
+    createCoverMenuItems: function() {
+        var self = this;
         menuCover = new Ext.menu.Menu({
             listeners: {
-                beforeshow: function () {
+                beforeshow: function() {
                     this.removeAll();
-                    addCoverMenuItems ();
+                    addCoverMenuItems();
                 }
             }
-	}) ;
-        var addCoverMenuItems = function()	{
-            var empty = true ;
-            layerStore.each (function (record)  {
+        });
+        var addCoverMenuItems = function() {
+            var empty = true;
+            self.layerStore.each(function(record) {
                 var layer = record.get('layer');
                 var queryable = record.get('queryable');
                 if (queryable) {
                     empty = false;
-                    menuCover.addItem (new Ext.menu.Item({
+                    menuCover.addItem(new Ext.menu.Item({
                         text: layer.name,
-                        handler: function () {
-                           onCoverItemCheck(record);
+                        handler: function() {
+                            self.onCoverItemCheck(record);
                         }
-                    })) ;
+                    }));
                 }
-            }) ;
-            if (empty)	{
-                menuCover.addItem (new Ext.menu.Item({
-                    text: tr ("mntsurf.nopointlayer"),
+            });
+            if (empty) {
+                menuCover.addItem(new Ext.menu.Item({
+                    text: tr("mntsurf.nopointlayer"),
                     disabled: true
-                 }));
+                }));
             }
-	};
-        addCoverMenuItems ();
+        };
+        addCoverMenuItems();
         return menuCover;
-    };
+    },
+    /**
+     * Method: createWPSControl
+     * Parameters:
+     * handlerType - {OpenLayers.Handler.Path}, map - {OpenLayers.Map} The map instance.
+     */
 
+    createWPSControl: function(handlerType) {
+        var self = this;
+        var drawPointCtrl = new OpenLayers.Control.DrawFeature(this.drawLayer, handlerType, {
+            featureAdded: function(feature) {
+                cloneFeature = feature.clone();
+                self.drawLayer.destroyFeatures();
+                self.drawLayer.addFeatures([cloneFeature]);
+                self.executeWPS();
+            },
+            activate: function() {
+                if (this.active) {
+                    return false;
+                }
+                GEOR.helper.msg(tr("mntsurf.wpsbvtitle"),
+                            tr("mntsurf.bvfromclickhelper"));
+                if (this.handler) {
+                    this.handler.activate();
+                }
+                this.active = true;
+                if (this.map) {
+                    OpenLayers.Element.addClass(
+                        this.map.viewPortDiv,
+                        this.displayClass.replace(/ /g, "") + "Active"
+                    );
+                }
+                this.events.triggerEvent("activate");
+                if (self.drawLayer.features.length >= 1) { // Only one outlet point at a time
+                    self.drawLayer.destroyFeatures();
+                }
+                return true;
+            },
+            deactivate: function(e) {
+                if (this.active) {
+                    if (this.handler) {
+                        this.handler.deactivate();
+                    }
+                    this.active = false;
+                    if (this.map) {
+                        OpenLayers.Element.removeClass(
+                            this.map.viewPortDiv,
+                            this.displayClass.replace(/ /g, "") + "Active"
+                        );
+                    }
+                    this.events.triggerEvent("deactivate");
+                }
+                if (self.drawLayer.features.length >= 1) { // Only one outlet point at a time
+                    self.drawLayer.destroyFeatures();
+                }
+            },
+            scope: this
+        });
+        return drawPointCtrl;
+    },
 
-    return {
-        /*
-         * Public
-         */
+    /**
+     * Method: init
+     *
+     * Parameters:
+     * record - {Ext.data.record} a record with the addon parameters
+     */
 
-        /**
-         * APIMethod: create
-         * 
-         * APIMethod: create
-         * Return a  {Ext.menu.Item} for GEOR_addonsmenu.js and initialize this module.
-         * Parameters:
-         * m - {OpenLayers.Map} The map instance.
-         */
+    init: function(record) {
+        var self = this;
+        var lang = OpenLayers.Lang.getCode();
+        map = this.map;
+        config = this.options;
+        this.toolbar = (this.options.toolbarplacement === "bottom") ? Ext.getCmp("mappanel").bottomToolbar : (this.options.toolbarplacement === "top") ? Ext.getCmp("mappanel").topToolbar : null;
+        this.layerStore = Ext.getCmp("mappanel").layers;
+        this.wpsURL = this.options.wpsURL;
+        this.wpsIdentifier = this.options.identifier;
+        metadataURL = this.options.metadataURL;
+        helpURL = this.options.helpURL;
+        this.enableDEM = this.options.enableDEM;
+        this.defaultDEM = this.options.defaultDEM;
+        var style = OpenLayers.Util.applyDefaults(this.defaultStyle, OpenLayers.Feature.Vector.style["default"]);
+        var styleMap = new OpenLayers.StyleMap({
+            'default': style
+        });
+        this.drawLayer = new OpenLayers.Layer.Vector("Exutoires BV", {
+            styleMap: styleMap,
+            displayInLayerSwitcher: false
 
-        init: function (record) {
-            var lang = OpenLayers.Lang.getCode() ;
-            map = this.map;
-            config = this.options;
-            this.toolbar  = (this.options.toolbarplacement === "bottom") ? Ext.getCmp("mappanel").bottomToolbar : (this.options.toolbarplacement === "top") ? Ext.getCmp("mappanel").topToolbar : null;         
-            layerStore  = Ext.getCmp("mappanel").layers;    
-            wpsURL = this.options.wpsURL;
-            wpsIdentifier = this.options.identifier;
-            metadataURL = this.options.metadataURL;
-            helpURL = this.options.helpURL;
-            enableDEM = this.options.enableDEM;
-            defaultDEM = this.options.defaultDEM;
-            defControl();
-            clickbv = new OpenLayers.Control.Click();
-            map.addControl(clickbv);
-            drawLayer = new OpenLayers.Layer.Vector("Exutoire", {
-                displayInLayerSwitcher: false
-            });
-            mask_loader = new Ext.LoadMask(Ext.getBody(), {
-                msg: tr ("mntsurf.processing")
-            });
-            map.addLayer (drawLayer) ;
-            var wpsMenu =  new Ext.menu.Menu({
-                    listeners: {
-                        beforeshow: function () {
-                            if (enableSelectionTool(map) === true) {
-                                Ext.getCmp('bvfromselection').enable() ;
-                            }else{
-                                Ext.getCmp('bvfromselection').disable();
-                            }
-                            if (wpsInitialized === false) {
-                                describeProcess(wpsURL, wpsIdentifier);
-                            }
-                        }
+        });
+        mask_loader = new Ext.LoadMask(Ext.getBody(), {
+            msg: tr("mntsurf.processing")
+        });
+        map.addLayer(this.drawLayer);
+        var wpsMenu = new Ext.menu.Menu({
+            listeners: {
+                beforeshow: function() {
+                    if (self.enableSelectionTool(map) === true) {
+                        Ext.getCmp('bvfromselection').enable();
+                    } else {
+                        Ext.getCmp('bvfromselection').disable();
+                    }
+                    if (self.wpsInitialized === false) {
+                        self.describeProcess(self.wpsURL, self.wpsIdentifier);
+                    }
+                },
+                scope: this
+            },
+            items: [
+                new Ext.menu.CheckItem(new GeoExt.Action({
+                    id: "clickbv",
+                    iconCls: 'drawpoint',
+                    text: tr("mntsurf.bvfromclick"),
+                    map: map,
+                    toggleGroup: 'map',
+                    enableToggle: true,
+                    allowDepress: true,
+                    tooltip: tr("mntsurf.bvfromclickmsgtitle"),
+                    control: this.createWPSControl(OpenLayers.Handler.Point),
+                    scope: this
+                })), new Ext.Action({
+                    id: "bvfromselection",
+                    iconCls: "wps-bvfromselection",
+                    text: tr("mntsurf.bvfromselection"),
+                    allowDepress: false,
+                    tooltip: tr("mntsurf.bvfromselectiontip"),
+                    disabled: true,
+                    handler: function() {
+                        self.getMapFeaturesSelection(map);
                     },
-                    items: [
-                    new Ext.menu.CheckItem (new Ext.Action ({
-                        id: "clickbv",
-                        iconCls: 'drawpoint',
-                        text: tr("mntsurf.bvfromclick"),
-                        map: map,
-			toggleGroup: 'map',
-			enableToggle: true,
-                        allowDepress: true,
-                        tooltip: "Afficher le Bassin Versant a l'amont du point selectionn�",
-                        handler: function () {
-                            clickbv.activate();
-                        }
-                    })), new Ext.Action({
-                        id: "bvfromselection",
-                        iconCls: "wps-bvfromselection",
-                        text: tr("mntsurf.bvfromselection"),
-                        allowDepress: false,
-                        tooltip: tr("mntsurf.bvfromselectiontip"),
-                        disabled: true,
-                        handler: function () {
-                            getMapFeaturesSelection(map);
-                        }
-                    }), new Ext.menu.Item ({
-                        id: "bvfromcover",
-                        iconCls: "ogc",
-                        text: tr("mntsurf.bvfromcover"),
-                        tooltip: tr("mntsurf.bvfromcovertip"),
-                        menu: createCoverMenuItems ()
-                    }), new Ext.Action({
-                        id: "bvfromGML",
-                        iconCls: "wps-uploadfile",
-                        text: tr("mntsurf.loadgml"),
-                        allowDepress: false,
-                        tooltip: tr("mntsurf.loadgmltip"),
-                        disabled: (window.File && window.FileReader && window.FileList) ? false : true,
-                        handler: function () {
-                            selectGMLFile();
-                        }
-                    }), new Ext.Action({
-                        id: "bvparameters",
-                        iconCls: "geor-btn-query",
-                        text: tr("mntsurf.parameters"),
-                        allowDepress: false,
-                        tooltip: tr("mntsurf.parameterstip"),
-                        handler: function () {
-                            getBvParameters();
-                        }
-                     }), new Ext.Action({
-                        id: "showmetadata",
-                        iconCls: "geor-btn-metadata",
-                        text: tr("mntsurf.showmetadata"),
-                        qtip: tr("mntsurf.showmetadatatip"),
-                        handler: function () {
-                           window.open(metadataURL);
-                        }
-                    }), new Ext.Action({
-                        id: "showhelp",
-                        iconCls: "wps-help",
-			text: tr("Help"),
-			qtip: tr("Show help"),
-                        handler: function () {
-                           window.open(helpURL);
-                        }
-                    })]
-            });
+                    scope: this
+                }), new Ext.menu.Item({
+                    id: "bvfromcover",
+                    iconCls: "ogc",
+                    text: tr("mntsurf.bvfromcover"),
+                    tooltip: tr("mntsurf.bvfromcovertip"),
+                    menu: this.createCoverMenuItems(),
+                    scope: this
+                }), new Ext.Action({
+                    id: "bvfromGML",
+                    iconCls: "wps-uploadfile",
+                    text: tr("mntsurf.loadgml"),
+                    allowDepress: false,
+                    tooltip: tr("mntsurf.loadgmltip"),
+                    disabled: (window.File && window.FileReader && window.FileList) ? false : true,
+                    handler: function() {
+                        self.selectGMLFile();
+                    },
+                    scope: this
+                }), new Ext.Action({
+                    id: "bvparameters",
+                    iconCls: "geor-btn-query",
+                    text: tr("mntsurf.parameters"),
+                    allowDepress: false,
+                    tooltip: tr("mntsurf.parameterstip"),
+                    handler: function() {
+                        self.getBvParameters();
+                    },
+                    scope: this
+                }), new Ext.Action({
+                    id: "showmetadata",
+                    iconCls: "geor-btn-metadata",
+                    text: tr("mntsurf.showmetadata"),
+                    qtip: tr("mntsurf.showmetadatatip"),
+                    handler: function() {
+                        window.open(metadataURL);
+                    },
+                    scope: this
+                }), new Ext.Action({
+                    id: "showhelp",
+                    iconCls: "wps-help",
+                    text: tr("Help"),
+                    qtip: tr("Show help"),
+                    handler: function() {
+                        window.open(helpURL);
+                    },
+                    scope: this
+                })
+            ]
+        });
+        if (this.target) {
+            // addon placed in toolbar
+            var menuButton = {
+                id: 'button-wpsbv',
+                iconCls: 'wps-bv',
+                tooltip: record.get("description")[lang] || record.get("description")["en"],
+                menu: wpsMenu,
+                scope: this
+            };
+            this.components = this.target.insertButton(this.position, menuButton);
+            this.target.doLayout();
+        } else {
+            // addon placed in "tools menu"
             var menuitems = new Ext.menu.Item({
                 text: record.get("title")[lang] || record.get("title")["en"],
                 qtip: record.get("description")[lang] || record.get("description")["en"],
-                hidden:(this.options.showintoolmenu ===true)? false: true,
-                listeners:{
-                    "afterrender": function( thisMenuItem ) { 
+                listeners: {
+                    "afterrender": function(thisMenuItem) {
                         Ext.QuickTips.register({
                             target: thisMenuItem.getEl().getAttribute("id"),
                             title: thisMenuItem.initialConfig.text
@@ -912,30 +1056,21 @@ GEOR.Addons.Wpsbv.prototype = (function () {
                     }
                 },
                 menu: wpsMenu,
-                iconCls: 'wps-bv'
+                iconCls: 'wps-bv',
+                scope: this
             });
-            if (this.toolbar !== null) {
-                var menuButton = {
-                    id: 'button-wpsbv',
-                    iconCls: 'wps-bv',
-                    tooltip: record.get("description")[lang] || record.get("description")["en"],
-                    menu: wpsMenu
-                };
-                this.toolbar.insert(parseInt(this.options.position,10),menuButton);
-                this.toolbar.insert(parseInt(this.options.position,10),"-");
-//                this.toolbar.insert(parseInt(this.options.position),{xtype: 'tbspacer', width: 50});
-                this.toolbar.doLayout();
-            }
             this.item = menuitems;
-            return menuitems;
-        },
-        destroy: function() {
-            this.map = null;
-            temp = this.toolbar.items.get('button-wpsbv');
-            this.toolbar.remove(temp); //remove temp (first item) from displayQty(toolbar)
-            this.toolbar.remove(this.toolbar.items.items[this.options.position]);
-//            this.toolbar.remove(this.toolbar.items.items[this.options.position]);
-            this.options = null;
         }
-    };
-})();
+
+    },
+    destroy: function() {
+        this.map = null;
+        temp = this.toolbar.items.get('button-wpsbv');
+        this.toolbar.remove(temp); //remove temp (first item) from displayQty(toolbar)
+        this.toolbar.remove(this.toolbar.items.items[this.options.position]);
+        this.drawLayer.destroy();
+        this.drawLayer = null;
+        this.options = null;
+        GEOR.Addons.Base.prototype.destroy.call(this);
+    }
+});

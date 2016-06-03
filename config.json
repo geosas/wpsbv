@@ -1,0 +1,20 @@
+[{
+        "id": "wpsbv",
+        "name": "Wpsbv",
+        "enabled": true,
+        "title": {
+            "en": "Watershed",
+            "es": "Cuenca",
+            "fr": "Bassin Versant"
+        },
+        "preloaded": "true",
+        "description": {
+            "en": "A tool to calculate the watershad boundary upstream of one or more points",
+            "es": "Una herramienta para calcular el contorno de la cuenca aguas arriba de uno o mÃ¡s puntos",
+            "fr": "Un outil qui permet de calculer le contour du Bassin Versant topographique à l'amont d'un ou de plusieurs points"
+        },
+        "options": {
+            "target": "tbar_11"
+        }
+}]
+
