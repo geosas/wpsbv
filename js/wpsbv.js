@@ -313,7 +313,6 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
                     self.wpsConfig.surfacemin.value = surfaceMinNumber.getValue();
                     self.wpsConfig.lissage.value = lissageCombo.getValue();
                     self.zoomToResultLayer = configForm.getForm().findField('chkzoomextent').getValue();
-                    //                        GEOR.Addons.Wpsbv.zoomToResultLayer = configForm.getForm().findField('chkzoomextent').getValue();
                     configForm.findParentByType('window').destroy();
                 }
             }, {
@@ -365,18 +364,8 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
                     if (features[0].geometry.CLASS_NAME == "OpenLayers.Geometry.Point") {
                         for (var i = 0; i < features.length; i++) {
                             var feat = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(features[i].geometry.getVertices()[0].x, features[i].geometry.getVertices()[0].y));
-                            /*
-                                                            feat.style = {
-                                                                pointRadius: 18,
-                                                                fillColor: '#0055FF',
-                                                                fillOpacity: 0.8,
-                                                                strokeColor: '#000000'
-                                                            };
-                            */
                             this.drawLayer.addFeatures([feat]);
                         }
-                        //                        var gml = this.convertToGML (this.drawLayer.features) ;
-                        //                        this.executeWPS(gml);
                         this.executeWPS();
 
                     } else {
@@ -746,8 +735,7 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
                         layers: layerName,
                         transparent: true
                     }, {
-                        singletile: true,
-                        transitionEffect: 'resize'
+                        singletile: true
                     }
                 );
                 //                var c = GeoExt.data.LayerRecord.create();
@@ -755,6 +743,7 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
                 var layerRecord = new c({
                     layer: wmsdyn,
                     name: layerName,
+                    opaque: false,
                     type: "WMS"
                 });
                 var clone = layerRecord.clone();
@@ -762,7 +751,6 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
                     success: function() {
                         clone.get("layer").setName(clone.get("title"));
                         this.layerStore.addSorted(clone);
-                        //                        if (GEOR.Addons.Wpsbv.zoomToResultLayer)     {
                         if (this.zoomToResultLayer) {
                             zoomToLayerRecordExtent(clone);
                         }
@@ -774,7 +762,6 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
 
                         });
                         GEOR.waiter.hide();
-                        //                       layerStore.addSorted(clone);
                     },
                     scope: this
                 });
