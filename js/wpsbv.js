@@ -101,7 +101,7 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
 
     mask_loader: null,
 
-    _drawControl: null,
+    drawControl: null,
 
     tr: function(str) {
         return OpenLayers.i18n(str);
@@ -896,6 +896,7 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
             },
             scope: this
         });
+        this.drawControl = drawPointCtrl;
         return drawPointCtrl;
     },
 
@@ -939,9 +940,6 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
                         Ext.getCmp('bvfromselection').enable();
                     } else {
                         Ext.getCmp('bvfromselection').disable();
-                    }
-                    if (self.wpsInitialized === false) {
-                        self.describeProcess(self.wpsURL, self.wpsIdentifier);
                     }
                 },
                 scope: this
@@ -1048,16 +1046,15 @@ GEOR.Addons.Wpsbv = Ext.extend(GEOR.Addons.Base, {
             });
             this.item = menuitems;
         }
+        this.describeProcess(this.wpsURL, this.wpsIdentifier);
 
     },
     destroy: function() {
-        this.map = null;
-        temp = this.toolbar.items.get('button-wpsbv');
-        this.toolbar.remove(temp); //remove temp (first item) from displayQty(toolbar)
-        this.toolbar.remove(this.toolbar.items.items[this.options.position]);
-        this.drawLayer.destroy();
+        this.drawControl.deactivate();
+        this.map.removeLayer(this.drawLayer);
         this.drawLayer = null;
         this.options = null;
+        this.map = null;
         GEOR.Addons.Base.prototype.destroy.call(this);
     }
 });
