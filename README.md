@@ -67,7 +67,7 @@ Input process options:
  * **defaultDEM** - default Digital Elevation Model used by the process. Defaults to null, then the defaultValue returned by WPS describeProcess is used.
  * **enableDEM** - list of Digital Elevation Models available for the process. Defaults to null, then all the allowedValue returned by WPS describeProcess is used.
 
-To check all available DEM, try : http://geowww.agrocampus-ouest.fr/cgi-bin/mntsurf.cgi?service=WPS&version=1.0.0&request=describeProcess&identifier=ref_pts2watershed
+To check all available DEM, try : https://wps.geosas.fr/mntsurf?service=WPS&version=1.0.0&request=describeProcess&identifier=ref_pts2watershed
 ... and have a look to alloadValues property for input "MNT utilisé" 
  
 Place for addon menu:
